@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Torn Countdown — mock</title>
+<style>
+    body { background: #262626; color: #ddd; font-family: Arial, Helvetica, sans-serif; margin: 0; }
+    .header-navigation { background: #111; padding: 8px 14px; display: flex; justify-content: flex-end; }
+    ul.toolbar { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; }
+    li.tc-clock { position: relative; }
+    li.tc-clock button.tc_clock { background: #333; color: #ddd; border: 1px solid #555; border-radius: 3px;
+        width: 34px; height: 28px; cursor: pointer; }
+    li.tc-clock.active button.tc_clock { background: #555; }
+    .tc-clock-tooltip { position: absolute; right: 0; top: 32px; background: #1a1a1a; border: 1px solid #000;
+        border-radius: 4px; padding: 6px 10px; font-size: 12px; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,.6); }
+    .tc-clock-tooltip p { margin: 0; white-space: nowrap; }
+    .panel { padding: 20px; }
+    .panel button { background: #3a3a3a; color: #ddd; border: 1px solid #555; border-radius: 3px;
+        padding: 6px 12px; margin: 0 6px 6px 0; cursor: pointer; }
+    #tcd-test-out { white-space: pre; font-family: monospace; font-size: 12px; background: #111;
+        padding: 10px; border-radius: 4px; margin-top: 12px; max-height: 420px; overflow: auto; }
+</style>
+</head>
+<body>
+
+<div class="header-navigation right">
+    <ul class="toolbar clearfix">
+        <li class="tc-clock">
+            <button type="button" class="top_header_button button tc_clock" aria-label="Open TC clock">&#9719;</button>
+        </li>
+    </ul>
+</div>
+
+<div class="panel">
+    <h3>Torn Countdown mock</h3>
+    <p>Mock TCT now: <span id="mock-now"></span> — the clock popup is the real Torn markup.</p>
+    <button id="btn-seed">Seed example countdowns</button>
+    <button id="btn-rerender">Simulate React re-render of the popup</button>
+    <button id="btn-tests">Run tests</button>
+    <button id="btn-reset">Reset storage</button>
+    <div id="tcd-test-out">tests not run yet</div>
+</div>
+
+<script src="fixtures.js"></script>
+<script src="fake-gm.js"></script>
+<script>
+(function () {
+    const li = document.querySelector("li.tc-clock");
+    const btn = li.querySelector("button.tc_clock");
+    let tooltip = null;
+    let clockTimer = null;
+
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    let mockNow = window.TCD_FIXTURES.nowEpoch * 1000;
+    setInterval(function () { mockNow += 1000; }, 1000);
+
+    function clockText() {
+        const d = new Date(mockNow);
+        const pad = (n) => String(n).padStart(2, "0");
+        return DAYS[d.getUTCDay()] + " " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" +
+            pad(d.getUTCSeconds()) + " - " + pad(d.getUTCDate()) + "/" + pad(d.getUTCMonth() + 1) + "/" +
+            String(d.getUTCFullYear()).slice(2);
+    }
+
+    function paintMockNow() { document.getElementById("mock-now").textContent = clockText(); }
+    setInterval(paintMockNow, 1000);
+    paintMockNow();
+
+    function buildTooltip() {
+        const node = document.createElement("div");
+        node.className = "tc-clock-tooltip";
+        const p = document.createElement("p");
+        const span = document.createElement("span");
+        span.className = "server-date-time";
+        span.textContent = clockText();
+        p.appendChild(span);
+        node.appendChild(p);
+        return node;
+    }
+
+    function openClock() {
+        li.classList.add("active");
+        btn.setAttribute("aria-label", "Close TC clock");
+        tooltip = buildTooltip();
+        li.appendChild(tooltip);
+        clockTimer = setInterval(function () {
+            const span = tooltip.querySelector(".server-date-time");
+            if (span) span.textContent = clockText();
+        }, 1000);
+    }
+
+    function closeClock() {
+        li.classList.remove("active");
+        btn.setAttribute("aria-label", "Open TC clock");
+        if (clockTimer) clearInterval(clockTimer);
+        if (tooltip) tooltip.remove();
+        tooltip = null;
+    }
+
+    btn.addEventListener("click", function () {
+        if (li.classList.contains("active")) closeClock(); else openClock();
+    });
+
+    document.getElementById("btn-rerender").addEventListener("click", function () {
+        if (!tooltip) return;
+        tooltip.innerHTML = "";
+        const p = document.createElement("p");
+        const span = document.createElement("span");
+        span.className = "server-date-time";
+        span.textContent = clockText();
+        p.appendChild(span);
+        tooltip.appendChild(p);
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", function () {
+        localStorage.clear();
+        location.reload();
+    });
+
+    window.MOCK = {
+        get now() { return mockNow; },
+        set now(v) { mockNow = v; },
+        openClock: openClock,
+        closeClock: closeClock
+    };
+})();
+</script>
+<script src="../torn-countdown.user.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>
