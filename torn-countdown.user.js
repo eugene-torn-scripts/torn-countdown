@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Countdown
 // @namespace    https://github.com/eugene-torn-scripts
-// @version      1.0.0
+// @version      1.0.1
 // @description  Adds configurable countdown rows to Torn's TCT clock popup. Count down to any calendar event or a manual TCT date, with an optional preparation window that ends the countdown early.
 // @author       eugene_s [4192025]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
 (function () {
     "use strict";
 
-    const VERSION = "1.0.0";
+    const VERSION = "1.0.1";
     const STORE_KEY = "tcd_settings_v1";
     const CAL_TTL_MS = 6 * 60 * 60 * 1000;
     const BG_REFRESH_MS = 30 * 60 * 1000;
@@ -364,7 +364,10 @@
 
         const entries = (state.entries || []).filter((e) => e.enabled !== false);
         if (!entries.length) {
-            host.innerHTML = '<div class="tcd-empty">No countdowns yet.</div>';
+            if (host.dataset.ids !== "") {
+                host.dataset.ids = "";
+                host.innerHTML = '<div class="tcd-empty">No countdowns yet.</div>';
+            }
             return;
         }
 
@@ -404,17 +407,27 @@
             if (!entry) return;
             const info = rowStateFor(entry);
             const hasPrep = prepSeconds(entry) > 0;
-            row.className = "tcd-row tcd-mode-" + info.mode + (hasPrep ? " tcd-click" : "");
-            row.title = info.title + (hasPrep ? "\nClick to switch between the preparation deadline and the start." : "");
+            const cls = "tcd-row tcd-mode-" + info.mode + (hasPrep ? " tcd-click" : "");
+            const title = info.title + (hasPrep ? "\nClick to switch between the preparation deadline and the start." : "");
+            const labelText = entry.label || "(unnamed)";
             const label = row.querySelector(".tcd-label");
-            label.textContent = entry.label || "(unnamed)";
-            row.querySelector(".tcd-time").textContent = info.text;
+            const time = row.querySelector(".tcd-time");
+            if (row.className !== cls) row.className = cls;
+            if (row.title !== title) row.title = title;
+            if (label.textContent !== labelText) label.textContent = labelText;
+            if (time.textContent !== info.text) time.textContent = info.text;
         });
+    }
+
+    function syncRows() {
+        const tooltip = document.querySelector(".tc-clock-tooltip");
+        if (tooltip) renderRows(tooltip);
     }
 
     function onTooltipPresent(tooltip) {
         injectStyles();
         syncClockOffset();
+        if (!document.getElementById("tcd-overlay")) state = loadState();
         renderRows(tooltip);
         if (tickTimer) clearInterval(tickTimer);
         tickTimer = setInterval(() => {
@@ -423,13 +436,14 @@
                 tickTimer = null;
                 return;
             }
-            updateRows();
+            renderRows(tooltip);
         }, 1000);
     }
 
     function watchClock() {
         let watchedLi = null;
         let liObserver = null;
+        let classObserver = null;
         let throttled = false;
 
         const check = () => {
@@ -441,9 +455,18 @@
             const li = document.querySelector("li.tc-clock");
             if (!li || li === watchedLi) return;
             if (liObserver) liObserver.disconnect();
+            if (classObserver) classObserver.disconnect();
             watchedLi = li;
             liObserver = new MutationObserver(check);
             liObserver.observe(li, { childList: true, subtree: true });
+            classObserver = new MutationObserver(() => {
+                check();
+                if (li.classList.contains("active")) {
+                    syncClockOffset();
+                    syncRows();
+                }
+            });
+            classObserver.observe(li, { attributes: true, attributeFilter: ["class"] });
             check();
         };
 
@@ -613,6 +636,7 @@
             });
             saveState();
             paintEntries();
+            syncRows();
         });
 
         const list = modal.querySelector("#tcd-entries");
@@ -706,7 +730,7 @@
                     saveState();
                     applyMode();
                     paintPreview();
-                    updateRows();
+                    syncRows();
                 };
 
                 box.querySelectorAll("input, select").forEach((el) => {
@@ -717,10 +741,7 @@
                     state.entries = state.entries.filter((x) => x.id !== entry.id);
                     saveState();
                     paintEntries();
-                    const host = document.querySelector(".tc-clock-tooltip .tcd-rows");
-                    if (host) host.dataset.ids = "";
-                    const tooltip = document.querySelector(".tc-clock-tooltip");
-                    if (tooltip) renderRows(tooltip);
+                    syncRows();
                 });
 
                 applyMode();

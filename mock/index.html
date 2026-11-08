@@ -78,9 +78,15 @@
         return node;
     }
 
+    let persist = false;
+
     function openClock() {
         li.classList.add("active");
         btn.setAttribute("aria-label", "Close TC clock");
+        if (persist && tooltip) {
+            tooltip.style.display = "";
+            return;
+        }
         tooltip = buildTooltip();
         li.appendChild(tooltip);
         clockTimer = setInterval(function () {
@@ -92,6 +98,10 @@
     function closeClock() {
         li.classList.remove("active");
         btn.setAttribute("aria-label", "Open TC clock");
+        if (persist && tooltip) {
+            tooltip.style.display = "none";
+            return;
+        }
         if (clockTimer) clearInterval(clockTimer);
         if (tooltip) tooltip.remove();
         tooltip = null;
@@ -121,7 +131,9 @@
         get now() { return mockNow; },
         set now(v) { mockNow = v; },
         openClock: openClock,
-        closeClock: closeClock
+        closeClock: closeClock,
+        get persist() { return persist; },
+        set persist(v) { persist = v; }
     };
 })();
 </script>

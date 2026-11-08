@@ -210,6 +210,72 @@
         await sleep(50);
         ok("the settings modal closes", !document.getElementById("tcd-overlay"));
 
+        const rowLabels = () => Array.prototype.map.call(
+            document.querySelectorAll(".tc-clock-tooltip .tcd-row .tcd-label"), (n) => n.textContent);
+
+        const editState = baseState();
+        editState.entries = [entry({ id: "L1", label: "First", prepHours: 0 })];
+        T.setState(editState);
+        window.MOCK.persist = false;
+        window.MOCK.closeClock();
+        await sleep(30);
+        window.MOCK.openClock();
+        await sleep(100);
+        eq("live edit: one row before the edit", rowLabels().length, 1);
+
+        document.querySelector(".tc-clock-tooltip .tcd-settings-row").click();
+        await sleep(200);
+        document.getElementById("tcd-add").click();
+        await sleep(50);
+        eq("live edit: a new entry appears in the open popup at once", rowLabels().length, 2);
+
+        const boxes = document.querySelectorAll("#tcd-overlay .tcd-entry");
+        const newBox = boxes[boxes.length - 1];
+        const sel = newBox.querySelector(".tcd-f-event");
+        sel.value = "events|Black Friday";
+        sel.dispatchEvent(new Event("change"));
+        await sleep(50);
+        eq("live edit: a picked event names the new row", rowLabels()[1], "Black Friday");
+
+        const enabled = newBox.querySelector(".tcd-f-enabled");
+        enabled.checked = false;
+        enabled.dispatchEvent(new Event("change"));
+        await sleep(50);
+        eq("live edit: unchecking show in clock removes the row", rowLabels().length, 1);
+        enabled.checked = true;
+        enabled.dispatchEvent(new Event("change"));
+        await sleep(50);
+        eq("live edit: checking it again brings the row back", rowLabels().length, 2);
+
+        newBox.querySelector(".tcd-f-delete").click();
+        await sleep(50);
+        eq("live edit: delete removes the row", rowLabels().length, 1);
+        document.querySelector("#tcd-overlay .tcd-close").click();
+        await sleep(30);
+
+        window.MOCK.persist = true;
+        window.MOCK.closeClock();
+        await sleep(30);
+        window.MOCK.openClock();
+        await sleep(100);
+        window.MOCK.closeClock();
+        await sleep(30);
+        const s2 = T.getState();
+        s2.entries.push(entry({ id: "L2", label: "Added while hidden", prepHours: 0 }));
+        T.setState(s2);
+        window.MOCK.openClock();
+        await sleep(100);
+        eq("kept popup: an entry added while hidden shows on reopen", rowLabels().length, 2);
+
+        let mutations = 0;
+        const counter = new MutationObserver((recs) => { mutations += recs.length; });
+        counter.observe(document.querySelector("li.tc-clock"), { childList: true, subtree: true, attributes: true, characterData: true });
+        await sleep(2100);
+        counter.disconnect();
+        ok("no mutation loop: few DOM writes per second", mutations < 40, mutations + " mutations in 2.1 s");
+        window.MOCK.persist = false;
+        window.MOCK.closeClock();
+
         lines.unshift(fail === 0 ? "ALL GREEN — " + pass + " passed" : fail + " FAILED, " + pass + " passed");
         out.textContent = lines.join("\n");
         window.TCD_RESULT = { pass: pass, fail: fail, lines: lines };

@@ -94,7 +94,7 @@ The mock reproduces the real clock markup, a fake Torn API and a fake
 userscript manager. No Torn account and no API key are needed.
 
 ```bash
-node mock/run-tests.js            # 64 assertions, headless Chrome
+node mock/run-tests.js            # 72 assertions, headless Chrome
 ```
 
 Open `mock/index.html` through a local web server to work on the layout by
